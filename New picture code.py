@@ -104,12 +104,14 @@ class MainWindow:
             return
 
         # list of photo extensions worked with
-        photoextensions = (".jpg", ".png", ".jpeg", ".bmp", ".cr2")
+        photo_extensions = (".jpg", ".png", ".jpeg", ".bmp", ".cr2")
+        video_extensions = ('avi', 'mts', 'mwv', 'mwa', 'mpg', 'mp4')
 
         files_copied = 0
         files_renamed = 0
         identical_photos = 0
         undated_images = 0
+        video_files = 0
         files_failed = 0
 
         log_path = os.path.join(os.getcwd(), "Photo Sorter log")
@@ -124,7 +126,7 @@ class MainWindow:
         for rootdir, dirs, filenames in os.walk(source_directory):
             for f in filenames:
                 # only copy if file is a photo
-                if f.lower().endswith(photoextensions):
+                if f.lower().endswith(photo_extensions):
 
                     try:
                         full_path = os.path.join(rootdir, f)
@@ -148,13 +150,12 @@ class MainWindow:
                             result, photo_name = self.check_identical_and_copy_file(photo_info, final_path)
                             log_text += "Source: " + full_path + "\nDestination:" + photo_name
                         except OSError:
-                            log_txt = open(log_path, "w")
-                            log_txt.write(log_start_time + "\n")
-                            log_txt.write("Process ended: " + str(datetime.datetime.now()) + "\n")
-                            log_txt.write("An error has occured: the destination may be out of storage\n")
-                            log_txt.write("******************************\n")
-                            log_txt.write(log_text)
-                            log_txt.close()
+                            with open(log_path, 'w') as log_file:
+                                log_file.write(log_start_time + "\n")
+                                log_file.write("Process ended: " + str(datetime.datetime.now()) + "\n")
+                                log_file.write("An error has occured: the destination may be out of storage\n")
+                                log_file.write("******************************\n")
+                                log_file.write(log_text)
                             self.action()
                             self.output_box["text"] = "An error has occurred: destination is out of space"
 
@@ -174,6 +175,34 @@ class MainWindow:
                     except OSError:
                         log_text += "An error as occurred with ths file: " + os.path.join(rootdir, f) + "\n\n"
                         files_failed += 1
+                elif f.lower().endswith(video_extensions):
+                    try:
+                        os.makedirs(os.path.join(destination_directory, "Videos"), exist_ok=True)
+                        full_path = os.path.join(rootdir, f)
+                        final_path = os.path.join(destination_directory, "Videos", f)
+                        name_base, name_extension = os.path.splitext(f)
+
+                        if Path(final_path).is_file():
+
+                            if os.path.getsize(full_path) != os.path.getsize(final_path):
+                                name_index = 1
+                                while Path(final_path).is_file():
+                                    final_path = os.path.join(destination_directory, "Videos",
+                                                              name_base + "(" + str(name_index) + ")" + name_extension)
+                                    name_index += 1
+                                video_files += 1
+                                log_text += "Source: " + full_path + "\nDestination:" + final_path + "\nVIDEO FILE\n\n"
+                                shutil.copy(full_path, final_path)
+                            else:
+                                identical_photos += 1
+                        else:
+                            video_files += 1
+                            log_text += "Source: " + full_path + "\nDestination:" + final_path + "\nVIDEO FILE\n\n"
+                            shutil.copy(full_path, final_path)
+
+                    except OSError:
+                        log_text += "An error as occurred with ths file: " + os.path.join(rootdir, f) + "\n\n"
+                        files_failed += 1
 
             # if user has pressed stop button stop the process
             if not self.is_process_running:
@@ -183,15 +212,15 @@ class MainWindow:
                         + "\nPhotos renamed: " + str(files_renamed) \
                         + "\nIdentical photos found: " + str(identical_photos) \
                         + "\nUndated photos: " + str(undated_images) \
+                        + "\nVideo files: " + str(video_files) \
                         + "\nFiles failed: " + str(files_failed)
+        with open(log_path, 'w') as log_file:
+            log_file.write(log_start_time + "\n")
+            log_file.write("Process ended: " + str(datetime.datetime.now()) + "\n")
+            log_file.write(results_stats + "\n")
+            log_file.write("************************************\n")
+            log_file.write(log_text)
 
-        log_txt = open(log_path, "w")
-        log_txt.write(log_start_time + "\n")
-        log_txt.write("Process ended: " + str(datetime.datetime.now()) + "\n")
-        log_txt.write(results_stats + "\n")
-        log_txt.write("************************************\n")
-        log_txt.write(log_text)
-        log_txt.close()
         # set process running to false
         self.output_box["text"] = results_stats + "\nResults log can be found at " + log_path
         #change button back to default
