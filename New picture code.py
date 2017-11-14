@@ -5,6 +5,7 @@ import exifread
 import datetime
 import shutil
 from pathlib import Path
+import threading
 
 
 class PictureInformation:
@@ -91,7 +92,9 @@ class MainWindow:
         else:
             self.start_button["text"] = "Stop"
             self.is_process_running = True
-            self.start_photo_sort()
+
+            sorting_thread = threading.Thread(target=self.start_photo_sort)
+            sorting_thread.start()
 
     def start_photo_sort(self):
 
@@ -99,7 +102,7 @@ class MainWindow:
         destination_directory = self.destination_input.get()
 
         if destination_directory.startswith(source_directory):
-            print("Destination directory can not be within the source directory")
+            self.output_box["text"] = "Error: Destination directory can not be within the source directory"
             self.action()
             return
 
@@ -130,6 +133,8 @@ class MainWindow:
 
                     try:
                         full_path = os.path.join(rootdir, f)
+                        self.output_box["text"] = "# files processed: %d \nCurrently processing: %s" % (
+                        files_copied, full_path)
                         photo_info = PictureInformation(full_path)
 
                         if photo_info.has_date:
@@ -201,13 +206,34 @@ class MainWindow:
                             shutil.copy(full_path, final_path)
 
                     except OSError:
-                        log_text += "An error as occurred with ths file: " + os.path.join(rootdir, f) + "\n\n"
+                        log_text += "An error as occurred with this file: " + os.path.join(rootdir, f) + "\n\n"
                         files_failed += 1
 
-            # if user has pressed stop button stop the process
-            if not self.is_process_running:
-                break
+                # if user has pressed stop button stop the process
+                if not self.is_process_running:
+                    print(self.is_process_running)
+                    results_stats = "Copying stopped!\nPhotos copied: " + str(files_copied) \
+                                    + "\nPhotos renamed: " + str(files_renamed) \
+                                    + "\nIdentical photos found: " + str(identical_photos) \
+                                    + "\nUndated photos: " + str(undated_images) \
+                                    + "\nVideo files: " + str(video_files) \
+                                    + "\nFiles failed: " + str(files_failed)
 
+                    with open(log_path, 'w') as log_file:
+                        log_file.write(log_start_time + "\n")
+                        log_file.write("Process ended: " + str(datetime.datetime.now()) + "\n")
+                        log_file.write(results_stats + "\n")
+                        log_file.write("************************************\n")
+                        log_file.write(log_text)
+
+                    self.output_box["text"] = results_stats + "\nResults log can be found at " + log_path
+
+                    self.start_button["text"] = "Start"
+                    self.is_process_running = False
+
+                    return
+
+        print(self.is_process_running)
         results_stats = "Copying done!\nPhotos copied: " + str(files_copied) \
                         + "\nPhotos renamed: " + str(files_renamed) \
                         + "\nIdentical photos found: " + str(identical_photos) \
