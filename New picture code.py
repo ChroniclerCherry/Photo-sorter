@@ -66,13 +66,19 @@ class MainWindow:
         self.start_button = tkinter.Button(master, text="Start", command=self.action)
         self.start_button.grid(row=4, column=0)
 
-        self.selection_var = tkinter.BooleanVar()
+        self.strict_identical_selection = tkinter.BooleanVar()
         # radio buttons to decide between stricter or looser image identical checks
-        self.strict_radio = tkinter.Checkbutton(master, text="Strict identical check", variable=self.selection_var)
+        self.strict_radio = tkinter.Checkbutton(master, text="Strict identical check",
+                                                variable=self.strict_identical_selection)
         self.strict_radio.grid(row=4, column=1)
 
+        self.move_selection = tkinter.BooleanVar()
+        # radio buttons to decide between stricter or looser image identical checks
+        self.move_radio = tkinter.Checkbutton(master, text="Move files instead of copy", variable=self.move_selection)
+        self.move_radio.grid(row=5, column=1)
+
         self.output_box = tkinter.Label(master, text="Press start to begin process")
-        self.output_box.grid(row=5, columnspan=2)
+        self.output_box.grid(row=6, columnspan=2)
 
     # put source folder path in correct text box
     def set_source(self):
@@ -197,13 +203,20 @@ class MainWindow:
                                     name_index += 1
                                 video_files += 1
                                 log_text += "Source: " + full_path + "\nDestination:" + final_path + "\nVIDEO FILE\n\n"
-                                shutil.copy(full_path, final_path)
+
+                                if self.move_selection:
+                                    shutil.move(full_path, final_path)
+                                else:
+                                    shutil.copy(full_path, final_path)
                             else:
                                 identical_photos += 1
                         else:
                             video_files += 1
                             log_text += "Source: " + full_path + "\nDestination:" + final_path + "\nVIDEO FILE\n\n"
-                            shutil.copy(full_path, final_path)
+                            if self.move_selection:
+                                shutil.move(full_path, final_path)
+                            else:
+                                shutil.copy(full_path, final_path)
 
                     except OSError:
                         log_text += "An error as occurred with this file: " + os.path.join(rootdir, f) + "\n\n"
@@ -211,7 +224,6 @@ class MainWindow:
 
                 # if user has pressed stop button stop the process
                 if not self.is_process_running:
-                    print(self.is_process_running)
                     results_stats = "Copying stopped!\nPhotos copied: " + str(files_copied) \
                                     + "\nPhotos renamed: " + str(files_renamed) \
                                     + "\nIdentical photos found: " + str(identical_photos) \
@@ -233,7 +245,6 @@ class MainWindow:
 
                     return
 
-        print(self.is_process_running)
         results_stats = "Copying done!\nPhotos copied: " + str(files_copied) \
                         + "\nPhotos renamed: " + str(files_renamed) \
                         + "\nIdentical photos found: " + str(identical_photos) \
@@ -263,7 +274,7 @@ class MainWindow:
             if photo1.size == os.path.getsize(final_path):
                 # size is identical
 
-                if self.selection_var:
+                if self.strict_identical_selection:
                     photo2 = PictureInformation(final_path)
 
                     if photo1.datetime_taken != photo2.datetime_taken:
@@ -295,12 +306,19 @@ class MainWindow:
                 name_index += 1
                 final_name = os.path.join(date_directory, name_base + "(" + str(name_index) + ")" + name_extension)
 
-            shutil.copy(photo1.path, final_name)
+            if self.move_selection:
+                shutil.move(photo1.path, final_name)
+            else:
+                shutil.copy(photo1.path, final_name)
 
         elif is_identical == DIFFERENT:
             # files are not identical in any way so just copy over
             final_name = os.path.join(date_directory, photo1.name)
-            shutil.copy(photo1.path, final_name)
+
+            if self.move_selection:
+                shutil.move(photo1.path, final_name)
+            else:
+                shutil.copy(photo1.path, final_name)
 
         return is_identical, final_name
 
