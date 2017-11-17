@@ -73,7 +73,7 @@ class MainWindow:
         self.strict_radio.grid(row=4, column=1)
 
         self.move_selection = tkinter.BooleanVar()
-        # radio buttons to decide between stricter or looser image identical checks
+        # radio buttons to decide if user wants to copy or move files
         self.move_radio = tkinter.Checkbutton(master, text="Move files instead of copy", variable=self.move_selection)
         self.move_radio.grid(row=5, column=1)
 
@@ -106,8 +106,9 @@ class MainWindow:
 
         source_directory = self.source_input.get()
         destination_directory = self.destination_input.get()
+        self.move_rather_than_copy_selection = self.move_selection
 
-        if destination_directory.startswith(source_directory):
+        if os.path.commonpath([source_directory]) == os.path.commonpath([source_directory, destination_directory]):
             self.output_box["text"] = "Error: Destination directory can not be within the source directory"
             self.action()
             return
@@ -161,7 +162,7 @@ class MainWindow:
                             result, photo_name = self.check_identical_and_copy_file(photo_info, final_path)
                             log_text += "Source: " + full_path + "\nDestination:" + photo_name
                         except OSError:
-                            with open(log_path, 'w') as log_file:
+                            with open(log_path, 'w', encoding='utf-8') as log_file:
                                 log_file.write(log_start_time + "\n")
                                 log_file.write("Process ended: " + str(datetime.datetime.now()) + "\n")
                                 log_file.write("An error has occured: the destination may be out of storage\n")
@@ -204,7 +205,7 @@ class MainWindow:
                                 video_files += 1
                                 log_text += "Source: " + full_path + "\nDestination:" + final_path + "\nVIDEO FILE\n\n"
 
-                                if self.move_selection:
+                                if self.move_rather_than_copy_selection:
                                     shutil.move(full_path, final_path)
                                 else:
                                     shutil.copy(full_path, final_path)
@@ -213,7 +214,7 @@ class MainWindow:
                         else:
                             video_files += 1
                             log_text += "Source: " + full_path + "\nDestination:" + final_path + "\nVIDEO FILE\n\n"
-                            if self.move_selection:
+                            if self.move_rather_than_copy_selection:
                                 shutil.move(full_path, final_path)
                             else:
                                 shutil.copy(full_path, final_path)
@@ -224,19 +225,10 @@ class MainWindow:
 
                 # if user has pressed stop button stop the process
                 if not self.is_process_running:
-                    results_stats = "Copying stopped!\nPhotos copied: " + str(files_copied) \
-                                    + "\nPhotos renamed: " + str(files_renamed) \
-                                    + "\nIdentical photos found: " + str(identical_photos) \
-                                    + "\nUndated photos: " + str(undated_images) \
-                                    + "\nVideo files: " + str(video_files) \
-                                    + "\nFiles failed: " + str(files_failed)
-
-                    with open(log_path, 'w') as log_file:
-                        log_file.write(log_start_time + "\n")
-                        log_file.write("Process ended: " + str(datetime.datetime.now()) + "\n")
-                        log_file.write(results_stats + "\n")
-                        log_file.write("************************************\n")
-                        log_file.write(log_text)
+                    results_stats = self.create_log(log_path, "Copying stopped!", log_start_time, files_copied,
+                                                    files_renamed,
+                                                    identical_photos, undated_images, video_files, files_failed,
+                                                    log_text)
 
                     self.output_box["text"] = results_stats + "\nResults log can be found at " + log_path
 
@@ -245,26 +237,40 @@ class MainWindow:
 
                     return
 
-        results_stats = "Copying done!\nPhotos copied: " + str(files_copied) \
-                        + "\nPhotos renamed: " + str(files_renamed) \
-                        + "\nIdentical photos found: " + str(identical_photos) \
-                        + "\nUndated photos: " + str(undated_images) \
-                        + "\nVideo files: " + str(video_files) \
-                        + "\nFiles failed: " + str(files_failed)
-        with open(log_path, 'w') as log_file:
-            log_file.write(log_start_time + "\n")
-            log_file.write("Process ended: " + str(datetime.datetime.now()) + "\n")
-            log_file.write(results_stats + "\n")
-            log_file.write("************************************\n")
-            log_file.write(log_text)
+        results_stats = self.create_log(log_path, "Copying done!", log_start_time, files_copied, files_renamed,
+                                        identical_photos, undated_images, video_files, files_failed, log_text)
 
         # set process running to false
         self.output_box["text"] = results_stats + "\nResults log can be found at " + log_path
         #change button back to default
         self.action()
 
-    # copies file photo1 to given directory from each date
+    def create_log(self, log_path,
+                   process_result,
+                   log_start_time,
+                   files_copied, files_renamed,
+                   identical_photos,
+                   undated_images,
+                   video_files,
+                   files_failed,
+                   log_text):
+        results_stats = process_result + "\nPhotos copied: " + str(files_copied) \
+                        + "\nPhotos renamed: " + str(files_renamed) \
+                        + "\nIdentical photos found: " + str(identical_photos) \
+                        + "\nUndated photos: " + str(undated_images) \
+                        + "\nVideo files: " + str(video_files) \
+                        + "\nFiles failed: " + str(files_failed)
 
+        with open(log_path, 'w', encoding='utf-8') as log_file:
+            log_file.write(log_start_time + "\n")
+            log_file.write("Process ended: " + str(datetime.datetime.now()) + "\n")
+            log_file.write(results_stats + "\n")
+            log_file.write("************************************\n")
+            log_file.write(log_text)
+
+        return results_stats
+
+    # copies file photo1 to given directory from each date
     def compare_photo_in_directory(self, photo1, date_directory):
 
         final_path = os.path.join(date_directory, photo1.name)
@@ -306,7 +312,7 @@ class MainWindow:
                 name_index += 1
                 final_name = os.path.join(date_directory, name_base + "(" + str(name_index) + ")" + name_extension)
 
-            if self.move_selection:
+            if self.move_rather_than_copy_selection:
                 shutil.move(photo1.path, final_name)
             else:
                 shutil.copy(photo1.path, final_name)
@@ -315,7 +321,7 @@ class MainWindow:
             # files are not identical in any way so just copy over
             final_name = os.path.join(date_directory, photo1.name)
 
-            if self.move_selection:
+            if self.move_rather_than_copy_selection:
                 shutil.move(photo1.path, final_name)
             else:
                 shutil.copy(photo1.path, final_name)
