@@ -27,7 +27,11 @@ class PictureInformation:
             self.datetime_taken = datetime.datetime(1, 1, 1, 1, 0, 0)
             self.has_date = False
         else:
-            self.datetime_taken = datetime.datetime.strptime(str(photo_tags['EXIF DateTimeOriginal']), t_format)
+            try:
+                self.datetime_taken = datetime.datetime.strptime(str(photo_tags['EXIF DateTimeOriginal']), t_format)
+            except:
+                self.datetime_taken = datetime.datetime(1, 1, 1, 1, 0, 0)
+                self.has_date = False
 
 
 IDENTICAL = 0
