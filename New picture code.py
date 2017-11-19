@@ -9,8 +9,9 @@ import threading
 
 
 class PictureInformation:
+    """This class takes a photo file, extracting and storing basic data: name, size, date taken, and the path"""
     def __init__(self, f):
-
+        """Takes file f and extracts and saves all relevant data"""
         self.path = f
         self.has_date = True
         t_format = '%Y:%m:%d %H:%M:%S'
@@ -19,6 +20,7 @@ class PictureInformation:
         with open(self.path, 'rb') as photo:
             photo_tags = exifread.process_file(photo)
 
+        # save the name and size
         self.name = os.path.basename(self.path)
         self.size = os.path.getsize(self.path)
 
@@ -27,6 +29,7 @@ class PictureInformation:
             self.datetime_taken = datetime.datetime(1, 1, 1, 1, 0, 0)
             self.has_date = False
         else:
+            # some files may have a datetime tag but it is empty
             try:
                 self.datetime_taken = datetime.datetime.strptime(str(photo_tags['EXIF DateTimeOriginal']), t_format)
             except:
@@ -40,10 +43,13 @@ DIFFERENT = 2
 
 
 class MainWindow:
+    """A simple program that will copy all photo and video files from a source
+    directory and sorts them to a destination"""
     is_process_running = False
 
     def __init__(self, master):
-
+        """Creates a simple UI that allows users to select source and destination directories as
+        well as provide some options, and displays progress/results during and after the process"""
         # set title of window
         self.master = master
         master.title("Photo sorter")
@@ -84,18 +90,22 @@ class MainWindow:
         self.output_box = tkinter.Label(master, text="Press start to begin process")
         self.output_box.grid(row=6, columnspan=2)
 
-    # put source folder path in correct text box
     def set_source(self):
+        """Puts source folder path in correct text box"""
+        # clears anything currently in textbox
         self.source_input.delete(0, tkinter.END)
+        # opens a file explorer to allow users to select source path
         self.source_input.insert(0, tkinter.filedialog.askdirectory())
 
-    # put destination folder path in correct text box
     def set_destination(self):
+        """Puts destination folder path in correct text box"""
+        # clears anything currently in textbox
         self.destination_input.delete(0, tkinter.END)
+        # opens a file explorer to allow users to select destination path
         self.destination_input.insert(0, tkinter.filedialog.askdirectory())
 
-    # executes or stops process when action button is clicked
     def action(self):
+        """Executes or stops the process depending on if process is currently running"""
         if self.is_process_running:
             self.start_button["text"] = "Start"
             self.is_process_running = False
@@ -103,15 +113,19 @@ class MainWindow:
             self.start_button["text"] = "Stop"
             self.is_process_running = True
 
+            # creates new thread to start the sorting process
             sorting_thread = threading.Thread(target=self.start_photo_sort)
             sorting_thread.start()
 
     def start_photo_sort(self):
+        """Begins the sorting process"""
 
+        # retrieve directories and determine user choice for moving or copying files
         source_directory = self.source_input.get()
         destination_directory = self.destination_input.get()
         self.move_rather_than_copy_selection = self.move_selection
 
+        # stops process if destination is in source
         if os.path.commonpath([source_directory]) == os.path.commonpath([source_directory, destination_directory]):
             self.output_box["text"] = "Error: Destination directory can not be within the source directory"
             self.action()
@@ -121,17 +135,22 @@ class MainWindow:
         photo_extensions = (".jpg", ".png", ".jpeg", ".bmp", ".cr2")
         video_extensions = ('avi', 'mts', 'mwv', 'mwa', 'mpg', 'mp4')
 
-        files_copied = 0
-        files_renamed = 0
-        identical_photos = 0
-        undated_images = 0
-        video_files = 0
-        files_failed = 0
+        # records results as they happen
+        self.files_copied = 0
+        self.files_renamed = 0
+        self.identical_photos = 0
+        self.undated_images = 0
+        self.video_files = 0
+        self.files_failed = 0
 
-        log_path = os.path.join(os.getcwd(), "Photo Sorter log")
+        # creates a path for the log in the same directory as program is in
+        self.log_path = os.path.join(os.getcwd(), "Photo Sorter log.txt")
 
-        log_start_time = "Process began at: " + str(datetime.datetime.now())
-        log_text = ""
+        # gets the start time
+        self.log_start_time = "Process began at: " + str(datetime.datetime.now())
+
+        # variable that records each file processed
+        self.log_text = ""
 
         global is_process_running
         self.output_box["text"] = "Copying in progress"
@@ -141,13 +160,14 @@ class MainWindow:
             for f in filenames:
                 # only copy if file is a photo
                 if f.lower().endswith(photo_extensions):
-
+                    # IO errors catches cases where files may be moved/deleted by the user while it is being processed
                     try:
                         full_path = os.path.join(rootdir, f)
-                        self.output_box["text"] = "# files processed: %d \nCurrently processing: %s" % (
-                        files_copied, full_path)
+                        self.output_box["text"] = "# files processed: %d \nCurrently processing: %s" % \
+                                                  (self.files_copied, full_path)
                         photo_info = PictureInformation(full_path)
 
+                        # if the photo has date taken metadata, create final path of directories based on year/month/day
                         if photo_info.has_date:
                             final_path = os.path.join(destination_directory,
                                                       str(photo_info.datetime_taken.year),
@@ -155,7 +175,8 @@ class MainWindow:
                                                       str(photo_info.datetime_taken.strftime("%B") + "_" + str(
                                                           photo_info.datetime_taken.day)))
                         else:
-                            undated_images += 1
+                            # if the photo has no date taken metadata, place it into a folder of unsorted files
+                            self.undated_images += 1
                             final_path = os.path.join(destination_directory, "Undated")
 
                         # create directory for the file
@@ -164,33 +185,27 @@ class MainWindow:
                         # copy file
                         try:
                             result, photo_name = self.check_identical_and_copy_file(photo_info, final_path)
-                            log_text += "Source: " + full_path + "\nDestination:" + photo_name
+                            self.log_text += "Source: " + full_path + "\nDestination:" + photo_name
                         except OSError:
-                            with open(log_path, 'w', encoding='utf-8') as log_file:
-                                log_file.write(log_start_time + "\n")
-                                log_file.write("Process ended: " + str(datetime.datetime.now()) + "\n")
-                                log_file.write("An error has occured: the destination may be out of storage\n")
-                                log_file.write("******************************\n")
-                                log_file.write(log_text)
-                            self.action()
-                            self.output_box["text"] = "An error has occurred: destination is out of space"
-
+                            self.create_log("ERROR")
                             return
 
                         # log results
                         if result == IDENTICAL:
-                            log_text += " IDENTICAL, DID NOT COPY\n\n"
-                            identical_photos += 1
+                            self.log_text += " IDENTICAL, DID NOT COPY\n\n"
+                            self.identical_photos += 1
                         elif result == IDENTICAL_NAME:
-                            log_text += "\nRENAMED\n\n"
-                            files_renamed += 1
-                            files_copied += 1
+                            self.log_text += "\nRENAMED\n\n"
+                            self.files_renamed += 1
+                            self.files_copied += 1
                         elif result == DIFFERENT:
-                            log_text += "\n\n"
-                            files_copied += 1
+                            self.log_text += "\n\n"
+                            self.files_copied += 1
                     except OSError:
-                        log_text += "An error as occurred with ths file: " + os.path.join(rootdir, f) + "\n\n"
-                        files_failed += 1
+                        self.log_text += "An error as occurred with ths file: " + os.path.join(rootdir, f) + "\n\n"
+                        self.files_failed += 1
+
+                # if the file is a video, place it into a seperate video folder
                 elif f.lower().endswith(video_extensions):
                     try:
                         os.makedirs(os.path.join(destination_directory, "Videos"), exist_ok=True)
@@ -199,84 +214,85 @@ class MainWindow:
                         name_base, name_extension = os.path.splitext(f)
 
                         if Path(final_path).is_file():
-
+                            # file with the same name already exists in destination
                             if os.path.getsize(full_path) != os.path.getsize(final_path):
+                                # if identical name files have different sizes they are different files, rename the file
                                 name_index = 1
                                 while Path(final_path).is_file():
                                     final_path = os.path.join(destination_directory, "Videos",
                                                               name_base + "(" + str(name_index) + ")" + name_extension)
                                     name_index += 1
-                                video_files += 1
-                                log_text += "Source: " + full_path + "\nDestination:" + final_path + "\nVIDEO FILE\n\n"
+                                    self.video_files += 1
+                                    self.log_text += "Source: " + full_path + "\nDestination:" + final_path + "\nVIDEO FILE\n\n"
 
                                 if self.move_rather_than_copy_selection:
                                     shutil.move(full_path, final_path)
                                 else:
                                     shutil.copy(full_path, final_path)
                             else:
-                                identical_photos += 1
+                                # if name and size are the same, don't move it
+                                self.identical_photos += 1
                         else:
-                            video_files += 1
-                            log_text += "Source: " + full_path + "\nDestination:" + final_path + "\nVIDEO FILE\n\n"
+                            self.video_files += 1
+                            self.log_text += "Source: " + full_path + "\nDestination:" + final_path + "\nVIDEO FILE\n\n"
                             if self.move_rather_than_copy_selection:
                                 shutil.move(full_path, final_path)
                             else:
                                 shutil.copy(full_path, final_path)
 
                     except OSError:
-                        log_text += "An error as occurred with this file: " + os.path.join(rootdir, f) + "\n\n"
-                        files_failed += 1
+                        self.log_text += "An error as occurred with this file: " + os.path.join(rootdir, f) + "\n\n"
+                        self.files_failed += 1
 
                 # if user has pressed stop button stop the process
                 if not self.is_process_running:
-                    results_stats = self.create_log(log_path, "Copying stopped!", log_start_time, files_copied,
-                                                    files_renamed,
-                                                    identical_photos, undated_images, video_files, files_failed,
-                                                    log_text)
+                    results_stats = self.create_log("Copying stopped!")
 
-                    self.output_box["text"] = results_stats + "\nResults log can be found at " + log_path
+                    self.output_box["text"] = results_stats + "\nResults log can be found at " + self.log_path
 
                     self.start_button["text"] = "Start"
                     self.is_process_running = False
 
                     return
 
-        results_stats = self.create_log(log_path, "Copying done!", log_start_time, files_copied, files_renamed,
-                                        identical_photos, undated_images, video_files, files_failed, log_text)
+        results_stats = self.create_log("Copying done!")
 
         # set process running to false
-        self.output_box["text"] = results_stats + "\nResults log can be found at " + log_path
+        self.output_box["text"] = results_stats + "\nResults log can be found at " + self.log_path
         #change button back to default
         self.action()
 
-    def create_log(self, log_path,
-                   process_result,
-                   log_start_time,
-                   files_copied, files_renamed,
-                   identical_photos,
-                   undated_images,
-                   video_files,
-                   files_failed,
-                   log_text):
-        results_stats = process_result + "\nPhotos copied: " + str(files_copied) \
-                        + "\nPhotos renamed: " + str(files_renamed) \
-                        + "\nIdentical photos found: " + str(identical_photos) \
-                        + "\nUndated photos: " + str(undated_images) \
-                        + "\nVideo files: " + str(video_files) \
-                        + "\nFiles failed: " + str(files_failed)
+    def create_log(self, process_result):
+        # if the process was stopped due to an error
+        if process_result == "ERROR":
+            with open(self.log_path, 'w', encoding='utf-8') as log_file:
+                log_file.write(self.log_start_time + "\n")
+                log_file.write("Process ended: " + str(datetime.datetime.now()) + "\n")
+                log_file.write("An error has occured: the destination may be out of storage\n")
+                log_file.write("******************************\n")
+                log_file.write(self.log_text)
+            self.action()
+            self.output_box["text"] = "An error has occurred: destination is out of space"
+        else:
+            # with no errors that stopped the process write the log
+            results_stats = process_result + "\nPhotos copied: " + str(self.files_copied) \
+                            + "\nPhotos renamed: " + str(self.files_renamed) \
+                            + "\nIdentical photos found: " + str(self.identical_photos) \
+                            + "\nUndated photos: " + str(self.undated_images) \
+                            + "\nVideo files: " + str(self.video_files) \
+                            + "\nFiles failed: " + str(self.files_failed)
 
-        with open(log_path, 'w', encoding='utf-8') as log_file:
-            log_file.write(log_start_time + "\n")
-            log_file.write("Process ended: " + str(datetime.datetime.now()) + "\n")
-            log_file.write(results_stats + "\n")
-            log_file.write("************************************\n")
-            log_file.write(log_text)
+            with open(self.log_path, 'w', encoding='utf-8') as log_file:
+                log_file.write(self.log_start_time + "\n")
+                log_file.write("Process ended: " + str(datetime.datetime.now()) + "\n")
+                log_file.write(results_stats + "\n")
+                log_file.write("************************************\n")
+                log_file.write(self.log_text)
 
         return results_stats
 
-    # copies file photo1 to given directory from each date
     def compare_photo_in_directory(self, photo1, date_directory):
-
+        """checks if photo1 is identical to a file in the destination directory already or not"""
         final_path = os.path.join(date_directory, photo1.name)
 
         if Path(final_path).is_file():
@@ -300,6 +316,7 @@ class MainWindow:
             return DIFFERENT
 
     def check_identical_and_copy_file(self, photo1, date_directory):
+        """checks if a file already exists in destination and if not, copies/moves it"""
         # check if file exists already
         is_identical = self.compare_photo_in_directory(photo1, date_directory)
         final_name = ""
