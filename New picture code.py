@@ -6,6 +6,7 @@ import datetime
 import shutil
 from pathlib import Path
 import threading
+import remove_empty_folders
 
 
 class PictureInformation:
@@ -26,14 +27,14 @@ class PictureInformation:
 
         # check if it has date time
         if "EXIF DateTimeOriginal" not in photo_tags:
-            self.datetime_taken = datetime.datetime(1, 1, 1, 1, 0, 0)
+            self.datetime_taken = datetime.datetime(datetime.MINYEAR, 1, 1)
             self.has_date = False
         else:
             # some files may have a datetime tag but it is empty
             try:
                 self.datetime_taken = datetime.datetime.strptime(str(photo_tags['EXIF DateTimeOriginal']), t_format)
             except:
-                self.datetime_taken = datetime.datetime(1, 1, 1, 1, 0, 0)
+                self.datetime_taken = datetime.datetime(datetime.MINYEAR, 1, 1)
                 self.has_date = False
 
 
@@ -172,8 +173,11 @@ class MainWindow:
                             final_path = os.path.join(destination_directory,
                                                       str(photo_info.datetime_taken.year),
                                                       str(photo_info.datetime_taken.strftime("%B")),
-                                                      str(photo_info.datetime_taken.strftime("%B") + "_" + str(
-                                                          photo_info.datetime_taken.day)))
+                                                      str(
+                                                          photo_info.datetime_taken.strftime(
+                                                              "%B") + "_"
+                                                          + str(
+                                                              photo_info.datetime_taken.day)))
                         else:
                             # if the photo has no date taken metadata, place it into a folder of unsorted files
                             self.undated_images += 1
@@ -227,6 +231,8 @@ class MainWindow:
 
                                 if self.move_rather_than_copy_selection:
                                     shutil.move(full_path, final_path)
+                                    os.remove(full_path)
+
                                 else:
                                     shutil.copy(full_path, final_path)
                             else:
@@ -256,6 +262,9 @@ class MainWindow:
                     return
 
         results_stats = self.create_log("Copying done!")
+
+        remove_empty_folders.removeEmptyFolders(source_directory,
+                                                removeRoot=False)
 
         # set process running to false
         self.output_box["text"] = results_stats + "\nResults log can be found at " + self.log_path
@@ -321,6 +330,8 @@ class MainWindow:
         is_identical = self.compare_photo_in_directory(photo1, date_directory)
         final_name = ""
         if is_identical == IDENTICAL:
+            if self.move_rather_than_copy_selection:
+                os.remove(photo1.path)
             # if two files are identical do not copy
             return is_identical, ""
         elif is_identical == IDENTICAL_NAME:

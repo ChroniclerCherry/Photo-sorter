@@ -1,13 +1,13 @@
 # Photo-sorter
-Moves all photos from a source directory to a destination sorted by date
-Proposed changes from Anluren:
-   1. add textbox on the main windows to display current status:
-        . number of files processed in source directory
-        . number of files copied, which is number in first bullet minus 
-          duplicates
-   2. add options dialog, so the program can:
-        . simply the logic of comparing identical picture, so it runs faster
-          when dealing with very large number of files and slow links (network).
-   3. picture without date taken should be put into "unsorted" subdirectory
-   4. need to test raw file (.cr2)
- 
+This small script will move all photos from a given source directory to a given
+destination directory, while sorting them into folders by year and date. Videos
+will be placed unsorted into a seperate folder
+
+Options are included to either copy files while sorting, or moving files while
+sorting. Moving files will delete directories as the source folders become
+ empty
+
+There is an option for a stricter check of identical photos which will slow the
+process down
+
+A log of all activites will be recorded at Photo Sorter log.txt
