@@ -11,3 +11,5 @@ There is an option for a stricter check of identical photos which will slow the
 process down
 
 A log of all activites will be recorded at Photo Sorter log.txt
+
+Code to remove empty folders found at: https://gist.github.com/jacobtomlinson/9031697
