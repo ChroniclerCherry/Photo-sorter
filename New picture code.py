@@ -124,17 +124,17 @@ class MainWindow:
         # retrieve directories and determine user choice for moving or copying files
         source_directory = self.source_input.get()
         destination_directory = self.destination_input.get()
-        self.move_rather_than_copy_selection = self.move_selection
+        self.move_rather_than_copy_selection = self.move_selection.get()
 
         # stops process if destination is in source
-        if os.path.commonpath([source_directory]) == os.path.commonpath([source_directory, destination_directory]):
+        if Path(source_directory) in Path(destination_directory).parents:
             self.output_box["text"] = "Error: Destination directory can not be within the source directory"
             self.action()
             return
 
         # list of photo extensions worked with
         photo_extensions = (".jpg", ".png", ".jpeg", ".bmp", ".cr2")
-        video_extensions = ('avi', 'mts', 'mwv', 'mwa', 'mpg', 'mp4')
+        video_extensions = ('avi', 'mts', 'wmv', 'mwa', 'mpg', 'mp4')
 
         # records results as they happen
         self.files_copied = 0
@@ -309,7 +309,7 @@ class MainWindow:
             if photo1.size == os.path.getsize(final_path):
                 # size is identical
 
-                if self.strict_identical_selection:
+                if self.strict_identical_selection.get():
                     photo2 = PictureInformation(final_path)
 
                     if photo1.datetime_taken != photo2.datetime_taken:
